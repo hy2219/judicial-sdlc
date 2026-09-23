@@ -1,0 +1,97 @@
+name: Build merged workflow
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Verified squash merge commit
+        required: true
+        type: string
+      issue:
+        description: Original request Issue
+        required: true
+        type: string
+      pull_request:
+        description: Merged implementation PR
+        required: true
+        type: string
+      approval:
+        description: Provenance from the trusted metadata-only controller
+        required: true
+        type: string
+    outputs:
+      artifact_url:
+        value: ${{ jobs.build.outputs.artifact_url }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      artifact_url: ${{ steps.artifact.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Save trusted merge provenance
+        shell: pwsh
+        env:
+          APPROVAL_JSON: ${{ inputs.approval }}
+          APPROVED_HEAD: ${{ inputs.source_sha }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:APPROVED_HEAD) {
+            throw "Checkout does not match the verified squash merge."
+          }
+          [System.IO.File]::WriteAllText("$env:RUNNER_TEMP/approved-source.json", $env:APPROVAL_JSON, [System.Text.UTF8Encoding]::new($false))
+      - name: Public-content preflight
+        run: python .github/scripts/check_public_content.py
+      - name: Install pinned CPU-only PyTorch wheels
+        run: python -m pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pinned build and OCR dependencies
+        run: python -m pip install -r packaging/requirements.txt
+      - name: Verify CPU-only PyTorch installation
+        run: python -c "import torch; assert torch.version.cuda is None, 'CUDA builds are not allowed'"
+      - name: Unit tests
+        run: python .github/scripts/runtime_check.py --phase unit --unit-results "${{ runner.temp }}/unit-results.json"
+      - name: Source CLI self-test
+        run: python run.py --self-test
+      - name: Prepare verified OCR models and license notices (build time only)
+        run: python modules/ocr/prepare.py
+      - name: Source offline Korean and English OCR self-test
+        run: python -m tests.ocr_check
+      - name: E2E tests (actual OCR, HTTP, GUI and export)
+        run: python .github/scripts/runtime_check.py --phase e2e --unit-results "${{ runner.temp }}/unit-results.json"
+      - name: Build directory payload and verify frozen OCR module archive
+        run: python packaging/freeze_windows.py
+      - name: Compile fixed-folder installer (do not install or run)
+        shell: pwsh
+        env:
+          APPROVED_HEAD: ${{ inputs.source_sha }}
+        run: python packaging/build_installer.py --version "demo-${{ github.run_number }}" --commit "$env:APPROVED_HEAD" --approval "$env:RUNNER_TEMP/approved-source.json"
+      - name: Write metadata and checksum
+        shell: pwsh
+        env:
+          APPROVED_HEAD: ${{ inputs.source_sha }}
+        run: python packaging/package_metadata.py --exe dist/workflow-setup.exe --version "demo-${{ github.run_number }}" --commit "$env:APPROVED_HEAD" --approval "$env:RUNNER_TEMP/approved-source.json"
+      - name: Upload installer artifact
+        id: artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workflow-setup-pr-${{ inputs.pull_request }}-run-${{ github.run_number }}
+          path: |
+            dist/workflow-setup.exe
+            dist/release-metadata.json
+            dist/SHA256SUMS.txt
+            dist/THIRD-PARTY-NOTICES.txt
+            dist/payload-manifest.json
+            dist/installer-build.json
+            dist/frozen-ocr-audit.json
+          retention-days: 14
+          if-no-files-found: error

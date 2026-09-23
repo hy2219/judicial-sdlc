@@ -1,0 +1,81 @@
+name: 업무 자동화 요청
+description: 실제 문서 없이 업무 흐름을 설명하고 계획 PR부터 요청합니다.
+title: "[업무 자동화] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        개발·CI에는 가상 자료만 사용합니다. 실제 재판 PDF, 스캔/사진, 개인정보, 사건 자료, 내부 URL,
+        계정·비밀번호·토큰, 수신자 이메일을 본문/댓글/첨부 어디에도 올리지 마세요.
+        익명화한 실제 문서도 여기에 올리지 마세요. 파일 대신 형식·업무 흐름을 가상 예시로 설명하세요.
+        설치 앱은 허가된 실제 PDF를 사용자 PC에서만 파싱합니다. 합성 표시나 샘플 생성은 필수가 아닙니다.
+        양식과 CI가 민감 자료 업로드 자체를 차단하는 것은 아닙니다.
+        등록 후 Assignees에서 Copilot을 선택하세요. 시작 브랜치는 main이며 추가 프롬프트는 필요 없습니다.
+        Copilot은 같은 PR에 계획부터 작성합니다. 계획 단계에서는 병합하지 마세요.
+        계획을 확인한 뒤 그 PR에 @copilot 구현 요청 댓글을 남기면 같은 PR에서 구현합니다.
+        구현과 소스 검사를 확인하고 main으로 Squash and merge하면 설치파일을 제작합니다.
+        별도 작업 API 토큰·활성화 변수·두 번째 PR·SHA 입력은 필요 없습니다.
+  - type: textarea
+    id: task
+    attributes:
+      label: 하고 싶은 작업
+      description: 누구의 어떤 반복 작업을 줄이려는지 가상 상황으로 설명해 주세요.
+      placeholder: 가상 문서에서 필요한 항목을 골라 표로 정리하고 싶습니다.
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: 입력
+      description: 입력 형식·가상 예시와 입력을 준비하는 방법(내장 입력·앱 생성·별도 생성)을 적어 주세요. 실제 내용이나 파일은 금지합니다.
+      placeholder: 일반 로컬 PDF를 선택해 처리하고 싶습니다. 개발 시험용으로는 같은 표 구조의 가상 PDF를 만들고, 실제 문서는 업로드하지 않습니다.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: 출력
+      description: 화면이나 보고서에 어떤 정보를 보여 주면 좋을까요?
+      placeholder: 항목·출처·확인 필요 여부를 보여주는 표와 저장 버튼
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 결과와 완료 조건
+      description: 어떤 합성 입력으로 어떤 순서를 실행하면 화면·저장 결과가 어떻게 나와야 하는지 적어 주세요.
+      placeholder: 요청한 각 입력 형식의 준비부터 결과 저장까지 실제 자료 없이 재현되어야 합니다. 빈 입력·누락·오류 때의 결과도 계획에 포함해주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: 오류 또는 예외 상황
+      description: 오류가 없으면 없음이라고 적으세요. 원본 로그/화면 캡처 대신 가상 설명을 사용하세요.
+      placeholder: OCR 신뢰도가 낮거나 모델이 누락되면 원문 확인 경고 또는 오류를 보여주세요.
+    validations:
+      required: true
+  - type: dropdown
+    id: fixture
+    attributes:
+      label: 사용할 합성 fixture
+      description: 계획의 출발점입니다. 선택한 공통 fixture가 업무 전체를 재현하는지는 별도로 확인하고, 부족한 합성 입력은 시나리오 안에서 생성하도록 계획합니다.
+      options:
+        - 기본 화면의 내장 가상 글자
+        - OCR 시험 도구가 생성한 합성 텍스트 PDF
+        - 모의 검색·SLM 모듈의 고정 응답
+        - 로컬 모의 API의 인증 또는 연결 실패
+        - OCR 시험 도구가 생성한 한국어·영어 합성 스캔 (로컬 KLOCR)
+        - OCR 모델 누락·손상 또는 읽기 실패
+        - 업무에 맞는 합성 입력·생성 방법을 계획에서 설계
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 공유할 정보 확인
+      options:
+        - label: 실제 문서·개인정보·사건자료·자격증명·내부 URL·수신자 이메일을 포함하지 않았으며, 이후 댓글/첨부에도 올리지 않겠습니다.
+          required: true
+        - label: 같은 PR에서 계획 확인 후 구현을 요청하고, 구현 완료 후에만 main에 Squash and merge하겠습니다.
+          required: true

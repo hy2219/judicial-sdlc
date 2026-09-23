@@ -1,0 +1,80 @@
+name: Accepted PR to installer
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  control:
+    if: >-
+      github.event.repository.private &&
+      !github.event.repository.is_template
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: read
+      checks: read
+    outputs:
+      stage: ${{ steps.flow.outputs.stage }}
+      issue: ${{ steps.flow.outputs.issue }}
+      pr: ${{ steps.flow.outputs.pr }}
+      source: ${{ steps.flow.outputs.source }}
+      approval: ${{ steps.flow.outputs.approval }}
+    steps:
+      # workflow_run loads the default-branch controller, never the triggering PR.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Resolve merged source through read-only GitHub metadata
+        id: flow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/merged_build.py --event "$GITHUB_EVENT_PATH"
+
+  installer:
+    needs: control
+    if: needs.control.outputs.stage == 'build'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/windows-build.yml
+    with:
+      source_sha: ${{ needs.control.outputs.source }}
+      issue: ${{ needs.control.outputs.issue }}
+      pull_request: ${{ needs.control.outputs.pr }}
+      approval: ${{ needs.control.outputs.approval }}
+
+  notify:
+    needs: [control, installer]
+    if: always() && (needs.control.outputs.stage == 'build' || needs.control.outputs.stage == 'blocked')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Link the result on the original Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ needs.control.outputs.issue }}
+          SOURCE: ${{ needs.control.outputs.source }}
+          BUILD_RESULT: ${{ needs.installer.result }}
+          ARTIFACT_URL: ${{ needs.installer.outputs.artifact_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$BUILD_RESULT" = "success" ] && [ -n "$ARTIFACT_URL" ]; then
+            printf '설치파일 제작이 완료됐습니다.\n\n[다운로드](%s) · [빌드 기록](%s)\n\n소스: `%s`\n\nZIP을 풀어 workflow-setup.exe를 사용합니다. 보관 기간 14일. 설치·실행 및 기관 보안 정책 허가는 별도입니다. 실제 PDF는 허가된 PC에서만 처리하고 파일·본문·결과를 GitHub에 올리지 마세요.\n' "$ARTIFACT_URL" "$RUN_URL" "$SOURCE" > "$RUNNER_TEMP/result.txt"
+          else
+            printf '설치파일 제작이 완료되지 않았습니다. 운영 담당자가 [빌드 기록](%s)을 확인해주세요. 이전 결과를 이번 결과로 사용하지 마세요.\n' "$RUN_URL" > "$RUNNER_TEMP/result.txt"
+          fi
+          gh issue comment "$ISSUE" --body-file "$RUNNER_TEMP/result.txt"
