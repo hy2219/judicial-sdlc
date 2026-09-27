@@ -26,7 +26,21 @@ jobs:
         run: python .github/scripts/check_public_content.py
       - name: Install lightweight dependencies (OCR packaging follows accepted merges)
         run: python -m pip install -r modules/ocr/requirements-text.txt
+      - name: Install Korean font and virtual GUI support
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-nanum xvfb xauth
+      - name: Verify source GUI display
+        run: |
+          xvfb-run -a python - <<'PY'
+          import tkinter as tk
+          window = tk.Tk()
+          try:
+              window.update()
+          finally:
+              window.destroy()
+          PY
       - name: Unit tests
-        run: python .github/scripts/runtime_check.py --phase unit
+        run: xvfb-run -a python .github/scripts/runtime_check.py --phase unit
       - name: Headless synthetic self-test
         run: python run.py --self-test

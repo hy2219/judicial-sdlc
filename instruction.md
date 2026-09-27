@@ -255,6 +255,8 @@ fixture: 가상 판결 C / "가상 작업실의 지붕은 노란색으로 정한
    PDFium·Pillow·OCR·모델이 필요한 모든 시험은 이 클래스에 두고 클래스 단위로
    JUDICIAL_RUNTIME_CHECKS=1 조건을 사용합니다. 경량 시험에서는 전체 의존성을 요구하지 마세요.
    공통 runtime_check.py의 --phase unit → --phase e2e를 순서대로 실행합니다.
+   Linux에서는 두 명령 앞에 xvfb-run -a를 붙입니다. 일반 PR CI도 가상 화면을 준비해
+   경량 GUI Unit 시험을 실행하지만, 실제 OCR·PDF 렌더링은 전체 의존성을 갖춘 E2E에서 확인합니다.
    Unit에서 실제 통과한 시험은 E2E에서 제외하고, RuntimeAcceptanceTests와
    다른 클래스에서 skip된 앱 시험은 E2E에서 실행합니다. 두 단계의 중복·누락을 방지합니다.
    소스·시험 목록·실행 환경이 다른 Unit 기록은 사용하지 않으며 코드 수정 후에는 Unit부터 재실행합니다.

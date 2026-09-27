@@ -800,6 +800,23 @@ class WorkflowContractTests(unittest.TestCase):
         ):
             self.assertNotIn(command, text)
 
+    def test_basic_ci_verifies_display_before_running_gui_unit_tests(self):
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        commands = [
+            "sudo apt-get update",
+            "sudo apt-get install -y --no-install-recommends fonts-nanum xvfb xauth",
+            "xvfb-run -a python - <<'PY'",
+            "window = tk.Tk()",
+            "window.update()",
+            "window.destroy()",
+            "run: xvfb-run -a python .github/scripts/runtime_check.py --phase unit",
+        ]
+        offsets = [text.index(command) for command in commands]
+        self.assertEqual(offsets, sorted(offsets))
+        for forbidden in ("continue-on-error", "|| true", "DISPLAY=", "--phase e2e"):
+            self.assertNotIn(forbidden, text)
+        self.assertEqual(text.count("runtime_check.py --phase unit"), 1)
+
     def test_agent_setup_prepares_real_offline_ocr_and_per_command_gui(self):
         text = (ROOT / ".github/workflows/copilot-setup-steps.yml").read_text(encoding="utf-8")
         self.assertIn("  copilot-setup-steps:", text)

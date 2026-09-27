@@ -52,8 +52,10 @@ branch protection rule**에서 `main`, **Require a pull request before merging**
 
 기본 브랜치의 `copilot-setup-steps.yml`은 Agent 작업 전에 고정 버전 CPU PyTorch·
 전체 OCR 의존성·검증된 모델·한국어 글꼴·Xvfb를 준비하고 공통 오프라인 OCR을 확인합니다.
-일반 `CI`는 계속 가벼운 텍스트 의존성만 사용합니다. 준비 단계의 공통 OCR 성공은
-시나리오 구현 완료를 뜻하지 않으며, 설치파일을 만들거나 실행하지도 않습니다.
+일반 `CI`의 Python 의존성은 가벼운 텍스트 읽기용으로 유지합니다. 한국어 글꼴·Xvfb·
+`xauth`를 준비하고 Tk 창 생성이 가능한지 확인한 뒤 `xvfb-run -a`로 Unit 시험을
+실행합니다. 일반 CI에서 OCR 모델·전체 OCR 의존성을 설치하거나 E2E를 실행하지 않습니다.
+준비 단계의 공통 OCR 성공은 시나리오 구현 완료를 뜻하지 않으며, 설치파일을 만들거나 실행하지도 않습니다.
 Copilot 설정의 `timeout-minutes`는 지원 상한인 59분입니다. 실제 Agent 실행 로그의
 적용 시간을 확인하며, 별도 Windows 설치파일 빌드의 60분 제한과 구분합니다.
 
