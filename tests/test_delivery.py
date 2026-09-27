@@ -768,11 +768,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("--extra-index-url", text)
         self.assertNotIn("continue-on-error", text)
 
-    def test_source_ci_avoids_push_and_ready_duplicates_for_pr_heads(self):
+    def test_source_ci_runs_on_ready_and_cancels_obsolete_pr_runs_only(self):
         text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn("types: [opened, synchronize, reopened]", text)
+        self.assertIn("types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]", text)
         self.assertIn("push:\n    branches: [main]", text)
-        self.assertNotIn("ready_for_review", text)
+        self.assertIn("group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}", text)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", text)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", text)
 
     def test_ci_skips_only_plan_changes_and_keeps_build_trigger_in_sync(self):
         text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
@@ -788,7 +790,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("workflows: [CI]", build)
 
     def test_basic_ci_remains_lightweight_without_ocr_downloads(self):
-        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8").split("\n  e2e:", 1)[0]
         self.assertIn("python -m pip install -r modules/ocr/requirements-text.txt", text)
         self.assertIn("python .github/scripts/runtime_check.py --phase unit", text)
         self.assertIn("python run.py --self-test", text)
@@ -801,7 +803,7 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertNotIn(command, text)
 
     def test_basic_ci_verifies_display_before_running_gui_unit_tests(self):
-        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8").split("\n  e2e:", 1)[0]
         commands = [
             "sudo apt-get update",
             "sudo apt-get install -y --no-install-recommends fonts-nanum xvfb xauth",
@@ -816,6 +818,33 @@ class WorkflowContractTests(unittest.TestCase):
         for forbidden in ("continue-on-error", "|| true", "DISPLAY=", "--phase e2e"):
             self.assertNotIn(forbidden, text)
         self.assertEqual(text.count("runtime_check.py --phase unit"), 1)
+
+    def test_pr_e2e_requires_real_runtime_and_propagates_failure_without_packaging(self):
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8").split("\n  e2e:", 1)[1]
+        self.assertIn("needs: test", text)
+        self.assertIn("if: github.event_name == 'pull_request' && !github.event.pull_request.draft", text)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha }}", text)
+        self.assertIn("runs-on: ubuntu-latest", text)
+        self.assertIn("timeout-minutes: 60", text)
+        commands = [
+            "python .github/scripts/check_public_content.py",
+            "sudo apt-get install -y --no-install-recommends fonts-nanum xvfb xauth",
+            "python -m pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cpu",
+            "python -m pip install -r requirements.txt",
+            "python -m pip check",
+            "assert torch.version.cuda is None",
+            "python modules/ocr/prepare.py",
+            "window = tk.Tk()",
+            "python -m tests.ocr_check",
+            "xvfb-run -a python .github/scripts/runtime_check.py --phase unit",
+            "xvfb-run -a python .github/scripts/runtime_check.py --phase e2e",
+        ]
+        offsets = [text.index(command) for command in commands]
+        self.assertEqual(offsets, sorted(offsets))
+        self.assertEqual(text.count('--unit-results "${{ runner.temp }}/unit-results.json"'), 2)
+        for forbidden in ("continue-on-error", "|| true", "always()", "download-artifact",
+                          "packaging/", "upload-artifact", "secrets.", "GH_TOKEN"):
+            self.assertNotIn(forbidden, text)
 
     def test_agent_setup_prepares_real_offline_ocr_and_per_command_gui(self):
         text = (ROOT / ".github/workflows/copilot-setup-steps.yml").read_text(encoding="utf-8")

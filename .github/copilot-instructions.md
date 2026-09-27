@@ -28,9 +28,13 @@ STOP and wait for a human @copilot implementation request in that PR ->
 implement in the SAME PR/branch -> human squash merge to main -> installer
 Artifact linked on the Issue. No special prompt is needed at assignment.
 Do not merge your own PR, create a second PR before the first is merged or start another agent task.
-Keep the planning PR draft until implementation is complete; explain in the PR
+Keep the planning PR draft until implementation is submitted for CI; explain in the PR
 that planning is ready for review but must not be merged yet.
-Make the PR ready for review when implementation is complete. Scenario task edits: app/**/*.py,
+After implementing the approved scope and acceptance tests, run Unit and targeted
+regressions, then make the PR ready for review to trigger the full CI E2E.
+Ready for review means submitted for CI, NOT acceptance passed. Report known failures
+and pending checks; do not wait for an agent-side full E2E pass before submitting.
+Scenario task edits: app/**/*.py,
 tests/test_app.py and the approved plans/<issue>.json only. All common code,
 packaging and dependencies require separate template maintenance.
 Keep the approved plan JSON unchanged in implementation. If scope changes,
@@ -101,9 +105,20 @@ Keep RuntimeAcceptanceTests in tests/test_app.py for source E2E tests before
 packaging; use actual app-generated inputs and OCR when requested.
 Put all PDFium/Pillow/OCR-dependent tests in RuntimeAcceptanceTests, gated at
 class level by JUDICIAL_RUNTIME_CHECKS=1. Lightweight tests must run with pypdf
-alone. Run runtime_check.py --phase unit, then --phase e2e in fresh processes.
+alone. In CI, run runtime_check.py --phase unit, then --phase e2e in fresh processes.
 Unit defers RuntimeAcceptanceTests and records successful app test IDs. E2E
 excludes only those successes; skipped app cases in other classes still run.
+Full E2E is owned by the PR CI `e2e` job after Ready for review, not by the agent.
+During implementation or repairs, run Unit and only the targeted OCR/GUI regressions
+needed for the change; do not repeatedly run the full E2E suite in the agent.
+CI reruns Unit in its own E2E environment, then runs full E2E on the exact PR head.
+Draft PRs defer E2E; a skipped check is not acceptance. New PR revisions cancel
+obsolete CI runs. CI failure must remain failure; do not edit workflow gates or
+weaken tests to get a green result. Pre-merge repairs stay on the same PR/branch.
+Only latest successful `test`, `e2e` and `scope` checks permit human merge.
+The installer controller also rejects a missing, skipped, pending or failed latest
+`e2e` on the exact implementation head, even if someone merges it manually.
+Windows source E2E remains required before packaging to catch platform differences.
 The E2E stage requires the same source, test inventory and run context as Unit.
 Do not reuse old Unit results after edits or another Actions job. E2E permits no
 skipped or expected-failure cases. Keep .test-results/ local and ignored.
@@ -133,9 +148,10 @@ certification. Keep this view generic rather than adding citation/table logic.
 Use Korean completion summaries, distinguish mocked versus actual checks, and
 never claim PR body/Draft changes without verifying they persisted.
 
-Run `python .github/scripts/runtime_check.py --phase unit`, then
-`python .github/scripts/runtime_check.py --phase e2e` after model preparation.
-On headless Linux prefix both with `xvfb-run -a`. Also run `python run.py --self-test`,
+Run `python .github/scripts/runtime_check.py --phase unit` during implementation.
+CI runs `python .github/scripts/runtime_check.py --phase e2e` after its own Unit
+and model preparation. On headless Linux prefix both with `xvfb-run -a`.
+Also run `python run.py --self-test`,
 `python .github/scripts/check_public_content.py`. Source tests and build success
 do not certify installation, runtime behavior, legal correctness or WDAC approval.
 Original template only: one root commit after authorized maintenance. Fresh scenario

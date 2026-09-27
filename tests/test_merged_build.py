@@ -118,6 +118,20 @@ class MergedBuildTests(unittest.TestCase):
                 self.assertEqual(result["issue"], 1)
                 self.assertNotIn("approval", result)
 
+    def test_main_unit_success_cannot_override_missing_or_failed_pr_e2e(self):
+        for conclusion in (None, "failure", "skipped", "cancelled", "timed_out"):
+            api = build_api()
+            checks = api.responses[f"/commits/{HEAD}/check-runs?per_page=100"]
+            if conclusion is None:
+                checks["check_runs"].pop()
+                checks["total_count"] = 1
+            else:
+                checks["check_runs"][1]["conclusion"] = conclusion
+            with self.subTest(conclusion=conclusion):
+                result = merged_build.handle(api, 42)
+                self.assertEqual(result["stage"], "blocked")
+                self.assertNotIn("approval", result)
+
 
 class ReviewScopeTests(unittest.TestCase):
     def test_follow_up_without_new_plan_is_allowed_before_merge(self):

@@ -7,9 +7,12 @@
 Issue에서 Copilot을 Assign한 뒤 같은 PR에서 계획 확인과 구현을 진행합니다.
 구현 완료 후 main에 squash 병합하면 소스 CI 뒤 ``Accepted PR to installer``가
 검증·제작을 연결합니다. 사용자가 PR 번호·커밋 SHA를 입력하지 않습니다.
-controller가 사람의 실제 squash 병합·변경 범위·계획 JSON을 확인하고
+병합 전에는 Ready for review인 PR의 CI에서 전체 E2E를 실행합니다.
+controller가 정확한 구현 head의 최신 test/e2e 성공·사람의 실제 squash 병합·변경 범위·계획 JSON을 확인하고
 ``Build merged workflow``를 호출합니다. 공통 modules/packaging/.github는
 시나리오 작업에서 변경할 수 없습니다. 계획 승인 댓글의 의미는 자동 검증하지 않습니다.
+PR E2E가 실패·미실행·skip·취소된 소스는 main Unit이 성공해도 제작하지 않습니다.
+Linux PR E2E와 별개로 아래 Windows E2E를 유지해 글꼴·줄바꿈·GUI의 플랫폼 차이를 확인합니다.
 
 운영 스크립트는 .github/scripts/에, 제작 스크립트는 packaging/에 있습니다.
 제작 스크립트는 앱 기능이 아니며 결과 EXE를 실행하거나 설치하지 않습니다.

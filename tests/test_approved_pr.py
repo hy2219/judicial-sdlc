@@ -50,10 +50,10 @@ class FakeGitHub(GitHub):
                 "content": base64.b64encode(b'{"issue":1,"input_preparation":"synthetic"}').decode(),
             },
             f"/commits/{HEAD}/check-runs?per_page=100": {
-                "total_count": 1, "check_runs": [{
-                    "id": 1, "name": "test", "head_sha": HEAD, "app": {"slug": "github-actions"},
+                "total_count": 2, "check_runs": [{
+                    "id": index, "name": name, "head_sha": HEAD, "app": {"slug": "github-actions"},
                     "status": "completed", "conclusion": "success",
-                }],
+                } for index, name in enumerate(("test", "e2e"), start=1)],
             },
         }
 
@@ -257,24 +257,41 @@ class ApprovedPRTests(unittest.TestCase):
         )
         resolve(api, 1, 2, SOURCE)
 
-    def test_missing_failed_or_newer_pending_source_ci_blocks(self):
-        for state in ("missing", "failure", "pending", "wrong_head", "too_many"):
-            api = FakeGitHub()
-            checks = api.responses[f"/commits/{HEAD}/check-runs?per_page=100"]
-            if state == "missing":
-                checks.update(total_count=0, check_runs=[])
-            elif state == "failure":
-                checks["check_runs"][0]["conclusion"] = "failure"
-            elif state == "wrong_head":
-                checks["check_runs"][0]["head_sha"] = BASE
-            elif state == "too_many":
-                checks["total_count"] = 101
-            else:
-                checks["check_runs"].append({**checks["check_runs"][0], "id": 2,
-                                            "status": "in_progress", "conclusion": None})
-                checks["total_count"] = 2
-            with self.subTest(state=state), self.assertRaises(ApprovalError):
-                require_ci(api, HEAD)
+    def test_only_latest_successful_unit_and_e2e_on_exact_head_allow_delivery(self):
+        for name in ("test", "e2e"):
+            for state in ("missing", "failure", "cancelled", "timed_out", "skipped",
+                          "neutral", "pending", "wrong_head", "missing_head", "wrong_app", "too_many"):
+                api = FakeGitHub()
+                checks = api.responses[f"/commits/{HEAD}/check-runs?per_page=100"]
+                previous = next(check for check in checks["check_runs"] if check["name"] == name)
+                latest = {**previous, "id": 3}
+                if state == "missing":
+                    checks["check_runs"].remove(previous)
+                else:
+                    checks["check_runs"].append(latest)
+                    if state in ("failure", "cancelled", "timed_out", "skipped", "neutral"):
+                        latest["conclusion"] = state
+                    elif state == "pending":
+                        latest.update(status="in_progress", conclusion=None)
+                    elif state == "wrong_head":
+                        latest["head_sha"] = BASE
+                    elif state == "missing_head":
+                        del latest["head_sha"]
+                    elif state == "wrong_app":
+                        checks["check_runs"].remove(previous)
+                        latest["app"] = {"slug": "other-app"}
+                checks["total_count"] = 101 if state == "too_many" else len(checks["check_runs"])
+                with self.subTest(name=name, state=state), self.assertRaises(ApprovalError):
+                    resolve(api, 1, 2, SOURCE)
+
+    def test_new_successful_e2e_supersedes_older_failure(self):
+        api = FakeGitHub()
+        checks = api.responses[f"/commits/{HEAD}/check-runs?per_page=100"]
+        old = checks["check_runs"][1]
+        checks["check_runs"].append({**old, "id": 3})
+        old["conclusion"] = "failure"
+        checks["total_count"] = 3
+        self.assertEqual(resolve(api, 1, 2, SOURCE)["implementation_head_sha"], HEAD)
 
     def test_unsafe_or_truncated_tree_fails(self):
         for value in ({"truncated": True, "tree": []}, tree({"../escape.py": HEAD}),

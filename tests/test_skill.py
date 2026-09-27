@@ -68,6 +68,19 @@ class SkillTests(unittest.TestCase):
                 self.assertIn(phrase, text, filename)
         self.assertIn(".test-results/", (ROOT / ".gitignore").read_text(encoding="utf-8"))
 
+    def test_full_e2e_belongs_to_ci_not_repeated_agent_execution(self):
+        for filename in (".github/copilot-instructions.md",
+                         ".github/skills/compose-workflow/SKILL.md"):
+            text = (ROOT / filename).read_text(encoding="utf-8")
+            with self.subTest(file=filename):
+                for phrase in ("Ready for review", "`e2e`", "targeted", "known failures"):
+                    self.assertIn(phrase, text)
+        guide = (ROOT / "instruction.md").read_text(encoding="utf-8")
+        self.assertIn("전체 E2E는 PR CI에 맡기고", guide)
+        self.assertIn("Draft 동안의 `e2e` 건너뜀은 통과가 아닙니다.", guide)
+        self.assertNotIn("최종 실제 RuntimeAcceptanceTests를 완료하세요.", guide)
+        self.assertNotIn("@copilot 병합 전 최종 점검을 해주세요.", guide)
+
     def test_walkthrough_requires_digitless_reference_and_negative_control(self):
         guide = (ROOT / "instruction.md").read_text(encoding="utf-8")
         for phrase in (

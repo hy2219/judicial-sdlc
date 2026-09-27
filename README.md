@@ -38,10 +38,11 @@ Assign과 `@copilot` 댓글은 로그인한 사용자가 GitHub 기본 기능으
 
 운영 배포에는 `main` 보호를 권장합니다. UI의 **Settings → Branches → Add classic
 branch protection rule**에서 `main`, **Require a pull request before merging**,
-**Require status checks to pass before merging**을 선택하고 `test`, `scope`를 필수로
-지정합니다. 새 저장소에서 `scope`가 안 보이면 첫 PR에 검사가 생성된 뒤 추가합니다.
+**Require status checks to pass before merging**을 선택하고 `test`, `e2e`, `scope`를 필수로
+지정합니다. 새 저장소에서 검사가 안 보이면 첫 구현 PR을 Ready for review로 전환해
+검사가 생성된 뒤 추가합니다. 템플릿 복사는 저장소 보호 설정까지 복사하지 않습니다.
 조직의 추가 리뷰 정책도 따릅니다. 보호 기능의 요금제 제한을 피하려고 공개로 전환하지 마세요.
-보호 기능 없는 개인 실습에서는 **사람이 두 검사 성공과 변경 범위를 직접 확인**해야 합니다.
+보호 기능 없는 개인 실습에서는 **사람이 세 검사 성공과 변경 범위를 직접 확인**해야 합니다.
 빌드 직전 검사는 잘못 병합된 소스를 main에서 되돌려 주지 않습니다.
 
 예전 API 연계 버전에서 복사한 저장소의 secret·변수·권한은 소스 업데이트로 자동 삭제되지
@@ -52,9 +53,10 @@ branch protection rule**에서 `main`, **Require a pull request before merging**
 
 기본 브랜치의 `copilot-setup-steps.yml`은 Agent 작업 전에 고정 버전 CPU PyTorch·
 전체 OCR 의존성·검증된 모델·한국어 글꼴·Xvfb를 준비하고 공통 오프라인 OCR을 확인합니다.
-일반 `CI`의 Python 의존성은 가벼운 텍스트 읽기용으로 유지합니다. 한국어 글꼴·Xvfb·
+`CI`의 `test` job은 가벼운 텍스트 읽기용 Python 의존성을 유지합니다. 한국어 글꼴·Xvfb·
 `xauth`를 준비하고 Tk 창 생성이 가능한지 확인한 뒤 `xvfb-run -a`로 Unit 시험을
-실행합니다. 일반 CI에서 OCR 모델·전체 OCR 의존성을 설치하거나 E2E를 실행하지 않습니다.
+실행합니다. 별도 `e2e` job은 Ready for review인 구현 PR에서만 전체 OCR 의존성과
+검증된 모델을 준비하고 실제 OCR·HTTP·GUI·저장 시험을 실행합니다.
 준비 단계의 공통 OCR 성공은 시나리오 구현 완료를 뜻하지 않으며, 설치파일을 만들거나 실행하지도 않습니다.
 Copilot 설정의 `timeout-minutes`는 지원 상한인 59분입니다. 실제 Agent 실행 로그의
 적용 시간을 확인하며, 별도 Windows 설치파일 빌드의 60분 제한과 구분합니다.
@@ -67,8 +69,9 @@ OCR 준비 완료로 보지 말고 원인을 해결해야 합니다. 방화벽�
 우회하지 않으며, 사전 준비에서도 공식 호스트 접근이 실패하면 승인된 실행 환경이 필요합니다.
 
 Linux Agent의 GUI 시험은 명령마다 `xvfb-run -a`로 실행합니다.
-구현 완료 전에는 아래 Unit → E2E 명령을 순서대로 실행해
-시나리오의 실제 OCR·화면·저장 경로를 확인합니다.
+구현 중에는 Unit과 수정에 필요한 짧은 회귀 시험을 실행합니다. 전체 E2E는 Agent에서
+반복하지 않고 CI가 담당합니다. 알려진 실패는 숨기지 않고 보고하며, 구현과 수용 시험을
+제출할 준비가 되면 Ready for review로 전환합니다. 이 전환은 합격 선언이 아닙니다.
 
 ## 사용 순서 — 같은 PR에서 계획과 구현
 
@@ -78,7 +81,8 @@ flowchart TD
     A --> P["하나의 PR<br/>계획 파일만 작성 후 대기"]
     P --> C["계획 검토 후 같은 PR에<br/>@copilot 구현 요청 댓글"]
     C --> R["같은 PR에 구현·소스 시험 추가"]
-    R --> M["사람이 결과 검토 후<br/>main에 Squash and merge"]
+    R --> E["Ready for review<br/>CI의 test·e2e·scope 확인"]
+    E --> M["모두 성공 후 사람이 검토<br/>main에 Squash and merge"]
     M --> B["자동 설치파일 빌드"]
     B --> D["원래 Issue에 Artifact 링크"]
 ```
@@ -97,8 +101,9 @@ flowchart TD
    소스 시험 후 검토를 기다리고, 직접 병합하거나 EXE를 실행하지 마세요.
    ```
 
-5. 같은 PR에 구현이 추가되면 변경 내용과 `test`·`scope` 성공을 확인합니다.
-   Draft라면 **Ready for review**로 바꾸고, 완료된 구현을 **Squash and merge**합니다.
+5. 같은 PR에 구현·수용 시험이 추가되면 **Ready for review**로 바꿔 CI E2E를 시작합니다.
+   필요하면 실행을 승인하고, 최신 코드의 `test`·`e2e`·`scope`가 모두 성공한 뒤
+   변경 내용을 검토해 **Squash and merge**합니다.
    계획과 구현이 함께 하나의 커밋으로 main에 남습니다.
 6. main 소스 CI 뒤 **Accepted PR to installer**가 정확한 병합 커밋으로 설치파일을
    만듭니다. 원래 Issue에 게시된 Artifact 링크에서 ZIP을 내려받습니다.
@@ -124,16 +129,27 @@ main의 기존 계획이 하나면 자동 연결합니다. 여러 개면 수정 
 **`CI`는 구현 변경이 들어간 PR과 `main` 병합 후에 실행합니다.** PR 변경이
 `plans/` 안의 파일뿐이면 소스 CI는 생략하고 `Trusted PR scope`로 범위·계획 형식만
 확인합니다. 필수 검사 `test`가 계획 단계에서 대기 상태여도 실행을 강제로 시작할
-필요는 없습니다. 같은 PR에 구현 변경이 추가되면 CI가 실행됩니다.
-계획 파일과 코드가 함께 바뀌는 PR도 생략하지 않습니다.
+필요는 없습니다. 같은 PR에 구현 변경이 추가되면 `test`가 실행됩니다.
+계획 파일과 코드가 함께 바뀌는 PR도 생략하지 않습니다. Draft의 `e2e`는 건너뛰지만
+이는 합격이 아닙니다. Ready 전환과 이후 수정마다 전체 E2E를 실행하며, 새 수정이나
+Draft 재전환은 같은 PR의 오래된 CI 실행을 취소합니다. main의 CI는 Unit만 실행하고
+전체 E2E는 뒤의 Windows 빌드에서 실행하여 병합 직후 Linux 전체 시험을 중복하지 않습니다.
+
+E2E의 실패·오류·skip·expected-failure는 `e2e` 실패로 표시됩니다. 실패한 PR은
+병합하지 않습니다. GitHub가 해당 실패 검사에 **Fix with Copilot**을 제공하면
+대상이 같은 PR/브랜치인지 확인하고 수정 요청에 사용할 수 있습니다. 버튼 제공·자동
+수정 성공은 이 템플릿이 보장하지 않습니다. 버튼이 없거나 다른 PR 생성을 요구하면
+임의로 병합하지 말고 운영자에게 알립니다. 기준 완화 대신 같은 기준으로 다시 검사합니다.
+설치 controller도 정확한 구현 head의 최신 `test`·`e2e` 성공을 요구하므로,
+E2E 미실행·실패 상태를 수동 병합해도 설치파일을 제작하지 않습니다.
 
 구현 검토에서는 시험 통과 개수만 보지 않고 **실제 생성 입력의 누락 여부,
 원문이 화면에서 읽히는지, OCR 신뢰도가 저장 결과에도 남는지**를 확인합니다.
-Windows 빌드는 **Unit tests → E2E tests**로 나눠 실행합니다.
+PR의 `e2e` job과 Windows 빌드는 각각 **Unit tests → E2E tests**로 나눠 실행합니다.
 Unit에서 실제 통과한 앱 시험은 E2E에서 반복하지 않습니다. E2E는
 `RuntimeAcceptanceTests`와 Unit에서 통과하지 않은 나머지 앱 시험을 실행합니다.
 다른 클래스에서 의존성 때문에 skip된 시험도 E2E에서 실행하므로 누락되지 않습니다.
-E2E의 누락·실패·skip·expected-failure는 패키징을 막습니다.
+E2E의 누락·실패·skip·expected-failure는 CI 실패이며 패키징도 막습니다.
 이는 소스 앱 시험이지 설치 EXE 실행은 아닙니다.
 패키징 후에는 EXE 내장 아카이브의 `torch.testing`·`torch.nn` 등 OCR 필수 모듈도
 검사해 누락되면 Setup 제작을 막습니다. `frozen-ocr-audit.json`은 모듈 포함 여부의

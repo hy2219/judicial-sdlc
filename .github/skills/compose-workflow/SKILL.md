@@ -172,10 +172,13 @@ implementation. Keep the planning step for new scope.
 4. Continue on the SAME PR and branch. Keep the plan JSON unchanged and implement
    only the approved application scope. No second PR, task branch or agent task.
    If scope needs changing, revise the plan and stop for a new human decision.
-5. Complete source tests and make this PR ready for review. The human inspects
-   the final code, plan and CI, then uses Squash and merge into main ONCE.
+5. Implement the acceptance tests, run Unit and targeted regressions, and make this
+   PR ready for review to submit it to CI. Full E2E belongs to the CI `e2e` job;
+   do not require an agent-side full-suite pass or claim pending checks passed.
+   Report known failures. The human inspects the final code, plan and latest
+   successful `test`, `e2e`, `scope`, then uses Squash and merge into main ONCE.
 6. After main source CI, the build workflow verifies final scope and the actual
-   human squash merge, builds that exact commit and posts the Artifact link on
+   human squash merge and successful PR-head E2E, builds that exact commit and posts the Artifact link on
    the Issue. Do not run generated EXEs or request manual SHA/build dispatch.
 
 Do NOT merge PRs yourself. Ordinary plan-approval comments are a human/agent
@@ -183,6 +186,17 @@ process, NOT machine-verified approval records. CI does not prove that the plan
 was approved before coding. Preserve the discussion and clearly request review.
 GitHub-required workflow-run approvals remain human actions; never bypass them.
 Process one request at a time in each scenario repository.
+
+### Before merge: CI failures
+
+Keep fixes on the same PR/branch and preserve the approved plan and thresholds.
+Use Unit and targeted regressions to repair the failing path; CI owns full E2E.
+Submit the updated PR as Ready for review even when reporting unresolved failures,
+so CI can expose them as failed checks rather than an agent-only report.
+Draft E2E skips are not passes. Do not merge or claim acceptance until the latest
+`test`, `e2e` and `scope` checks succeed. A Fix with Copilot button, when offered
+by GitHub for the failed check, is a repair entry point, not a guaranteed fix.
+Do not create a second implementation PR or weaken tests to bypass a failure.
 
 ### After merge: follow-up fixes
 
@@ -195,7 +209,7 @@ packaging or dependencies. Stay within app/**/*.py and tests/test_app.py.
 New scope still requires a new planned request. Explain acceptance-tolerance
 changes for explicit human review; never quietly skip tests or weaken checks.
 Sync trusted main updates before final checks. The human reviews the fix and
-successful test/scope checks, then squash-merges. Windows acceptance and packaging
+successful test/e2e/scope checks, then squash-merges. Windows acceptance and packaging
 run for that exact merge; the artifact is linked on the original Issue.
 Do not claim a repaired build was a first-pass instruction-only success.
 
@@ -277,9 +291,10 @@ For each acceptance case, cover all of **input -> retained records -> visible UI
 
 Keep `RuntimeAcceptanceTests` in `tests/test_app.py` and replace its generic shell
 case with real end-to-end source cases for this requested app. Gate the class with
-`JUDICIAL_RUNTIME_CHECKS=1` so lightweight CI does not need OCR/models. The Windows
-build uses `.github/scripts/runtime_check.py --phase unit` followed by
-`--phase e2e` AFTER model preparation. Unit records successful app test IDs and
+`JUDICIAL_RUNTIME_CHECKS=1` so the lightweight `test` job does not need OCR/models.
+PR CI's `e2e` job and the Windows build both run
+`.github/scripts/runtime_check.py --phase unit` followed by `--phase e2e` with
+verified models prepared before E2E. Unit records successful app test IDs and
 defers the named E2E class. E2E excludes only Unit successes; skipped app cases
 in other classes still run. The two stages must cover the entire app inventory
 without repeating passed tests. E2E permits no skip or expected failure.
@@ -327,9 +342,11 @@ Its common OCR check is not a scenario acceptance result. Inspect setup failures
 before proceeding: GitHub may still start the agent after a setup step fails.
 If preparation failed, report the exact missing prerequisite and request operator
 maintenance; do not bypass network controls or silently change dependency versions.
-On the headless Linux agent, run both stages with `xvfb-run -a`, including
-`xvfb-run -a python .github/scripts/runtime_check.py --phase unit` followed by
-`xvfb-run -a python .github/scripts/runtime_check.py --phase e2e` before completion.
+On the headless Linux agent, run
+`xvfb-run -a python .github/scripts/runtime_check.py --phase unit` and targeted
+regressions needed for the current change. Full E2E is not an agent completion
+requirement: the Ready-for-review PR CI runs its own Unit followed by
+`xvfb-run -a python .github/scripts/runtime_check.py --phase e2e`.
 Each invocation creates its own display; do not assume a setup display persists.
 Keep scenario runtime acceptance out of environment setup so unfinished scenario
 code does not prevent preparation of the environment needed to fix it.
@@ -344,7 +361,7 @@ Ask for human final review and never merge your own PR.
 python .github/scripts/runtime_check.py --phase unit
 python run.py --self-test
 python .github/scripts/check_public_content.py
-# After full dependencies and model preparation:
+# Full suite in CI after its own Unit, dependencies and model preparation:
 python .github/scripts/runtime_check.py --phase e2e
 ```
 

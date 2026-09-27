@@ -95,17 +95,18 @@ def require_ci(api, head):
     count, runs = checks.get("total_count"), checks.get("check_runs")
     if type(count) is not int or not 0 <= count <= 100 or not isinstance(runs, list) or len(runs) != count:
         raise ApprovalError("Cannot verify complete CI checks within the 100-check limit.")
-    source = [
-        check for check in runs
-        if check.get("name") == "test" and (check.get("app") or {}).get("slug") == "github-actions"
-    ]
-    if any(type(check.get("id")) is not int for check in source):
-        raise ApprovalError("Invalid source CI check identifier.")
-    latest = max(source, key=lambda check: check["id"]) if source else {}
-    if latest.get("status") != "completed" or latest.get("conclusion") != "success":
-        raise ApprovalError("The exact head needs a successful latest source CI 'test' check.")
-    if latest.get("head_sha", head) != head:
-        raise ApprovalError("Source CI check does not match the exact head.")
+    for name in ("test", "e2e"):
+        source = [
+            check for check in runs
+            if check.get("name") == name and (check.get("app") or {}).get("slug") == "github-actions"
+        ]
+        if any(type(check.get("id")) is not int for check in source):
+            raise ApprovalError("Invalid source CI check identifier.")
+        latest = max(source, key=lambda check: check["id"]) if source else {}
+        if latest.get("status") != "completed" or latest.get("conclusion") != "success":
+            raise ApprovalError(f"The exact head needs a successful latest source CI '{name}' check.")
+        if latest.get("head_sha") != head:
+            raise ApprovalError("Source CI check does not match the exact head.")
 
 
 def check_pr(pr, repository, default, bases):
