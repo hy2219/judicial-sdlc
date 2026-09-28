@@ -81,6 +81,23 @@ class SkillTests(unittest.TestCase):
         self.assertNotIn("최종 실제 RuntimeAcceptanceTests를 완료하세요.", guide)
         self.assertNotIn("@copilot 병합 전 최종 점검을 해주세요.", guide)
 
+    def test_printed_footer_is_best_effort_without_weakening_source_location_or_e2e(self):
+        guide = (ROOT / "instruction.md").read_text(encoding="utf-8")
+        output = guide.split("### 출력\n", 1)[1].split("### 기대 결과와 완료 조건\n", 1)[0]
+        acceptance = guide.split("### 기대 결과와 완료 조건\n", 1)[1].split("### 오류 또는 예외 상황\n", 1)[0]
+        for phrase in ("PDF 페이지 순번·원문 위치·강조 표시는 필수", "미인식·불명확하면 null + 경고"):
+            self.assertIn(phrase, output)
+        for phrase in (
+            "번호 100% 일치는 판례번호 기준",
+            "정상 scan·mixed·layered 입력에서도 쪽번호 미인식만으로 실패시키지 않습니다.",
+            "독립 정답과 일치해야 하며 오인식을 허용하지 않습니다.",
+            "모든 페이지를 무조건 null로 처리하지 않습니다.",
+            "쪽번호를 삭제하거나 E2E 시험을 skip하지 않고",
+            "PDF 순번 대체로 채우지 않습니다.",
+            "독립 문맥 정답 대비 CER 10% 이하",
+        ):
+            self.assertIn(phrase, acceptance)
+
     def test_walkthrough_requires_digitless_reference_and_negative_control(self):
         guide = (ROOT / "instruction.md").read_text(encoding="utf-8")
         for phrase in (
