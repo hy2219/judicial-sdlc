@@ -256,14 +256,20 @@ a human must still review the plan.
 Use instruction.md's conventions in the plan rather than proposing new tolerances.
 These conventions do not relax identifier accuracy, candidate counts or CI gates.
 
-- Context CER comparison only: normalize expected and actual U+0020, U+00A0,
-  TAB, CR and LF runs to one U+0020, then trim boundary spaces. Keep all other
-  characters unchanged. Do not delete all whitespace: a completely missing word
-  separator remains an error. Compare each occurrence's sentence and before/after
-  context separately using Levenshtein distance / normalized expected length,
-  at most 10%. Expected null requires null; an empty normalized expected string
-  requires an empty actual string. This is not parser, identifier-linking or
-  line/cell-boundary normalization. Display and JSON retain original whitespace.
+- Context CER comparison only: exclude U+0020, U+00A0, TAB, CR and LF from both
+  expected and actual strings. Whitespace insertion/deletion alone does not fail.
+  Preserve every other letter, digit and punctuation mark. Compare each occurrence's
+  sentence and before/after context with Levenshtein distance / whitespace-excluded
+  expected length, at most 10%. Expected null requires null; an empty comparison
+  string requires an empty actual comparison string, not null.
+  Report content CER and non-blocking whitespace-sensitive CER separately. For the
+  reference metric only, collapse specified whitespace runs to one space and trim
+  boundary spaces. Use explicit null/empty states rather than dividing by zero.
+  Log only test/field identifiers and metrics, not document contents or paths.
+  Include whitespace-only passing cases and non-whitespace errors exceeding 10%
+  that fail. Do not skip context tests or weaken exact case-ID checks. This rule
+  does not apply to parser input, identifier linking or line/cell boundaries.
+  Display and JSON retain original whitespace.
 - Ink containment comparison only: use at most 2px outward expansion of each
   reported source box at the original 2.5x render (0.8pt), not display pixels or
   2pt/3pt. The union must contain all independent expected number ink on the

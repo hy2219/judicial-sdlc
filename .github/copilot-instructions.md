@@ -103,12 +103,17 @@ Unit and real short-PDF E2E acceptance. Implement business linking in app/;
 do not claim generic table support or modify shared OCR to fit one fixture.
 Use the fixed acceptance conventions in instruction.md when planning context CER
 and source-box checks; do not invent a new tolerance during implementation or Fix:
-- Context CER comparison only: collapse runs of U+0020, U+00A0, TAB, CR and LF
-  to one U+0020 and trim boundary spaces in both expected and actual strings.
-  Do not delete all whitespace or normalize other characters. A missing word
-  separator still counts as an error. Apply Levenshtein distance / normalized
-  expected length per occurrence and context field, at most 10%. Null must remain
-  null; an empty normalized expected string requires an empty actual string.
+- Context CER comparison only: exclude U+0020, U+00A0, TAB, CR and LF from both
+  expected and actual strings. Whitespace insertion/deletion alone does not fail.
+  Keep all other letters, digits and punctuation unchanged. Apply Levenshtein
+  distance / whitespace-excluded expected length per occurrence and context field,
+  at most 10%. Null requires null; an empty comparison string requires an empty
+  actual comparison string, not null. Report content CER and a non-blocking
+  whitespace-sensitive CER separately; the latter collapses specified whitespace
+  runs to one space and trims boundary spaces before comparison. Report null/empty
+  states instead of dividing by zero. Log only test/field identifiers and metrics,
+  not document contents or paths. Test both whitespace-only passes and substantive
+  errors exceeding 10%; do not skip or delete context tests. Case IDs remain exact.
   Never use comparison normalization for parser input, identifier linking,
   line/cell boundaries, source display, JSON or page/line/coordinate checks.
 - Ink containment comparison only: allow 2px outward expansion on each reported

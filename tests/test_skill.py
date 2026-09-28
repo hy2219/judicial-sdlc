@@ -110,9 +110,10 @@ class SkillTests(unittest.TestCase):
             self.assertIn(phrase, output)
         for phrase in (
             "U+0020(공백)·U+00A0(NBSP)·탭·CR·LF",
-            "공백 한 칸으로 바꾸고 양끝 공백을 제거",
-            "단어 사이 공백이 완전히 사라진 차이는 여전히 오차",
-            "Levenshtein", "전체 공백 삭제는 금지",
+            "공백 삽입·누락·줄바꿈 차이만으로는 실패시키지 않습니다.",
+            "공백 제외 CER(합격 기준)과 공백 포함 CER(참고값)",
+            "문맥 시험을 skip·삭제하거나 무조건 성공 처리하지 않습니다.",
+            "Levenshtein", "번호 추출 전 전체 공백 삭제는 금지",
             "원본 이미지의 픽셀(0.8pt, 약 0.28mm)",
             "화면·JSON의 원래 상자 좌표는 바꾸지 않습니다.",
             "확장 전 실제 보고 상자", "2px를 넘는 잉크 누락은 실패",
@@ -128,6 +129,8 @@ class SkillTests(unittest.TestCase):
                                "unexpanded boxes", "missing number fragments",
                                "original whitespace", "absolute input paths"):
                     self.assertIn(phrase, text)
+                self.assertIn("Whitespace insertion/deletion alone does not fail.", text)
+                self.assertIn("whitespace-sensitive CER", text)
 
     def test_walkthrough_requires_digitless_reference_and_negative_control(self):
         guide = (ROOT / "instruction.md").read_text(encoding="utf-8")
