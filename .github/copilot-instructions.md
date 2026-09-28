@@ -101,6 +101,29 @@ candidate, null lookup key and no lookup, not guessing or truncating a key.
 Include wrapped-positive, cross-cell-negative and missing-geometry controls in
 Unit and real short-PDF E2E acceptance. Implement business linking in app/;
 do not claim generic table support or modify shared OCR to fit one fixture.
+Use the fixed acceptance conventions in instruction.md when planning context CER
+and source-box checks; do not invent a new tolerance during implementation or Fix:
+- Context CER comparison only: collapse runs of U+0020, U+00A0, TAB, CR and LF
+  to one U+0020 and trim boundary spaces in both expected and actual strings.
+  Do not delete all whitespace or normalize other characters. A missing word
+  separator still counts as an error. Apply Levenshtein distance / normalized
+  expected length per occurrence and context field, at most 10%. Null must remain
+  null; an empty normalized expected string requires an empty actual string.
+  Never use comparison normalization for parser input, identifier linking,
+  line/cell boundaries, source display, JSON or page/line/coordinate checks.
+- Ink containment comparison only: allow 2px outward expansion on each reported
+  box in the original 2.5x render (0.8pt), not display pixels or 2pt/3pt.
+  All independent expected number ink must lie in the union of expanded boxes
+  on the correct page. Keep displayed/exported source boxes unchanged.
+  Check adjacent-line intrusion using unexpanded boxes. Wrong pages/regions,
+  missing number fragments and ink missing beyond 2px still fail. Keep exact
+  identifier recognition. Include negative controls for these failures.
+- A user-saved local JSON result is not a diagnostic log. Preserve all source
+  text/context required by the Issue, including original whitespace and warnings;
+  never replace it with comparison-normalized strings. Exclude document contents
+  from logs, not from required local exports. Keep credentials and absolute input
+  paths out of JSON and logs. Never send real documents or result JSON to GitHub,
+  agents or Actions; cloud tests use synthetic inputs only.
 Keep RuntimeAcceptanceTests in tests/test_app.py for source E2E tests before
 packaging; use actual app-generated inputs and OCR when requested.
 Put all PDFium/Pillow/OCR-dependent tests in RuntimeAcceptanceTests, gated at

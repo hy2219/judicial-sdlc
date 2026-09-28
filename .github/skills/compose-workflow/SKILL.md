@@ -251,6 +251,32 @@ a human must still review the plan.
 
 ## Validation and boundaries
 
+### Fixed comparison and export conventions
+
+Use instruction.md's conventions in the plan rather than proposing new tolerances.
+These conventions do not relax identifier accuracy, candidate counts or CI gates.
+
+- Context CER comparison only: normalize expected and actual U+0020, U+00A0,
+  TAB, CR and LF runs to one U+0020, then trim boundary spaces. Keep all other
+  characters unchanged. Do not delete all whitespace: a completely missing word
+  separator remains an error. Compare each occurrence's sentence and before/after
+  context separately using Levenshtein distance / normalized expected length,
+  at most 10%. Expected null requires null; an empty normalized expected string
+  requires an empty actual string. This is not parser, identifier-linking or
+  line/cell-boundary normalization. Display and JSON retain original whitespace.
+- Ink containment comparison only: use at most 2px outward expansion of each
+  reported source box at the original 2.5x render (0.8pt), not display pixels or
+  2pt/3pt. The union must contain all independent expected number ink on the
+  correct page. Do not change displayed/exported boxes. Test adjacent-line
+  intrusion with unexpanded boxes. Wrong pages/regions, missing number fragments,
+  blank expected-ink regions and ink missing beyond 2px must fail. Add boundary
+  and negative controls; this tolerance does not permit OCR character errors.
+- Local JSON is a user-requested result, not a log: retain required source text,
+  context, original whitespace, warnings and all records regardless of filters.
+  Exclude document contents from logs, not required local JSON. Neither JSON nor
+  logs contain credentials or absolute input paths. Do not send real documents
+  or result JSON to GitHub/agents/Actions; use synthetic inputs for cloud tests.
+
 For each acceptance case, cover all of **input -> retained records -> visible UI
 -> exported data**, not just a successful module call. Apply these generic checks:
 
